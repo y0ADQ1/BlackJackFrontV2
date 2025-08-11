@@ -1,0 +1,13 @@
+<div class="container">
+  <h2>Join Game</h2>
+  <form (ngSubmit)="joinGame()">
+    <div class="form-group">
+      <label for="roomCode">Room Code:</label>
+      <input type="text" id="roomCode" [(ngModel)]="roomCode" name="roomCode" required>
+    </div>
+    <button type="submit">Join Game</button>
+    @if (errorMessage) {
+      <p class="error">{{ errorMessage }}</p>
+    }
+  </form>
+</div>
