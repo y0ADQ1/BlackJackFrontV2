@@ -18,6 +18,8 @@ export class WebsocketService {
   gameEnded$ = this.gameEndedSubject.asObservable();
   private playerJoinedSubject = new Subject<{ userId: number; message: string }>();
   playerJoined$ = this.playerJoinedSubject.asObservable();
+  private playerActionSubject = new Subject<{ message: string }>();
+  playerAction$ = this.playerActionSubject.asObservable();
 
   constructor(private authService: AuthService) {
     this.socket = io(environment.wsUrl, {
@@ -108,6 +110,11 @@ export class WebsocketService {
     this.socket.on('gameEnded', (data: { reason: string }) => {
       console.log('Game ended:', data.reason);
       this.gameEndedSubject.next(data);
+    });
+
+    this.socket.on('playerAction', (data: { message: string }) => {
+      console.log('Player action received:', data);
+      this.playerActionSubject.next(data);
     });
   }
 }

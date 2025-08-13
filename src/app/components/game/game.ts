@@ -69,19 +69,27 @@ export class GameComponent implements OnInit, OnDestroy {
         }
       }),
       this.websocketService.gameState$.subscribe(gameState => {
-        console.log('Received gameState in frontend:', {
-          roomCode: gameState?.roomCode,
-          players: gameState?.players?.map(player => ({
-            username: player.username,
-            isHost: player.isHost,
-            isCurrentUser: player.userId === gameState?.userPlayer?.id,
-            cards: player.cards.map(c => ({
-              id: c.id,
-              isVisible: c.isVisible,
-              filename: c.filename,
-            })),
-          })),
-        });
+        // Detectar si alguien tiene 21 y terminó la partida
+        if (gameState.status === 'finished' && gameState.cardsRevealed) {
+          const winner = gameState.players.find(p => p.userId === gameState.winnerId);
+          if (winner && winner.totalScore !== null && winner.totalScore === 21) {
+            this.notificationMessage = `¡${winner.username} logró 21! Fin de la partida.`;
+            setTimeout(() => this.notificationMessage = '', 4000);
+          } else if (!winner) {
+            this.notificationMessage = 'Nadie ganó, todos se pasaron de 21.';
+            setTimeout(() => this.notificationMessage = '', 4000);
+          }
+        }
+        // Notificar si un jugador se pasó de 21
+        if (gameState.players) {
+          const bustedPlayers = gameState.players.filter(p => p.isEliminated && p.totalScore !== null && p.totalScore > 21);
+          if (bustedPlayers.length > 0) {
+            bustedPlayers.forEach(player => {
+              this.notificationMessage = `El jugador ${player.username} se pasó de 21 y ha perdido.`;
+              setTimeout(() => this.notificationMessage = '', 4000);
+            });
+          }
+        }
         this.game = gameState;
       }),
       this.websocketService.playerJoined$.subscribe(data => {
@@ -108,6 +116,13 @@ export class GameComponent implements OnInit, OnDestroy {
       this.websocketService.gameEnded$.subscribe(data => {
         this.gameEndedReason = data.reason;
         console.log('Game ended:', data);
+      }),
+      this.websocketService.playerAction$.subscribe(data => {
+        // Solo el host debe ver el toast
+        if (this.game?.userPlayer?.isHost) {
+          this.notificationMessage = data.message;
+          setTimeout(() => this.notificationMessage = '', 3000);
+        }
       })
     );
   }
@@ -148,7 +163,7 @@ export class GameComponent implements OnInit, OnDestroy {
     }
   }
 
-  
+
 
   rematch(): void {
     if (this.game?.roomCode && this.game.userPlayer?.isHost) {
@@ -172,7 +187,7 @@ export class GameComponent implements OnInit, OnDestroy {
       });
     }
   }
-  
+
   // Llama al endpoint de startGame del backend
   startGameFromService(): void {
     if (this.game?.id) {
