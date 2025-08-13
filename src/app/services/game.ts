@@ -36,4 +36,19 @@ export class GameService {
   leaveGame(gameId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/api/games/${gameId}/leave`)
   }
+
+  startGame(gameId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/games/${gameId}/start`, {})
+  }
+
+  dealCards(gameId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/games/${gameId}/deal`, {})
+  }
+
+  stand(gameId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/games/${gameId}/stand`, {})
+  }
+  requestCard(gameId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/games/${gameId}/request-card`, {})
+  }
 }

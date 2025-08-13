@@ -46,9 +46,12 @@
                      class="card">
               }
             </div>
+            @if (player.totalScore != null && player.totalScore > 21) {
+              <p class="busted">Perdiste (Busted)</p>
+            }
           }
           @if (game.userPlayer?.isHost && player.isCurrentTurn && player.wantsCards && !player.isHost) {
-            <button (click)="dealCard(player.id)">Deal Card</button>
+            <button (click)="dealCardWebsocket(player.id)">Deal Card</button>
           }
         </div>
       }
@@ -61,7 +64,7 @@
           <button (click)="startGame()" [disabled]="(game.players | filterNonHost).length < 4">Start Game</button>
         }
         @if (game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost) {
-          <button (click)="requestCard()">Hit</button>
+          <button (click)="requestCardFromService()">Hit</button>
           <button (click)="skipTurn()">Stand</button>
         }
         @if (game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal && !game.userPlayer.isHost) {

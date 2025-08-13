@@ -148,12 +148,7 @@ export class GameComponent implements OnInit, OnDestroy {
     }
   }
 
-  dealCard(targetPlayerId: number): void {
-    if (this.game?.roomCode && this.game.userPlayer?.isHost) {
-      this.websocketService.dealCard(this.game.roomCode, targetPlayerId);
-      console.log('Dealing card to player:', targetPlayerId, 'in game:', this.game.roomCode);
-    }
-  }
+  
 
   rematch(): void {
     if (this.game?.roomCode && this.game.userPlayer?.isHost) {
@@ -173,6 +168,59 @@ export class GameComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.errorMessage = err.error?.message || 'Failed to leave game';
           console.error('Error leaving game:', err);
+        }
+      });
+    }
+  }
+  
+  // Llama al endpoint de startGame del backend
+  startGameFromService(): void {
+    if (this.game?.id) {
+      this.gameService.startGame(this.game.id).subscribe({
+        next: (response) => {
+          // Actualiza el estado del juego si es necesario
+          console.log('Game started:', response);
+        },
+        error: (err) => {
+          this.errorMessage = err.error?.message || 'Failed to start game';
+        }
+      });
+    }
+  }
+
+
+  // Reparte carta usando el websocket (solo host)
+  dealCardWebsocket(targetPlayerId: number): void {
+    if (this.game?.roomCode && this.game.userPlayer?.isHost) {
+      this.websocketService.dealCard(this.game.roomCode, targetPlayerId);
+      console.log('Host is dealing card to player:', targetPlayerId, 'in game:', this.game.roomCode);
+    }
+  }
+
+  // Llama al endpoint de stand del backend
+  stand(): void {
+    if (this.game?.id) {
+      this.gameService.stand(this.game.id).subscribe({
+        next: (response) => {
+          // Actualiza el estado del juego si es necesario
+          console.log('Stand action:', response);
+        },
+        error: (err) => {
+          this.errorMessage = err.error?.message || 'Failed to stand';
+        }
+      });
+    }
+  }
+
+  requestCardFromService(): void {
+    if (this.game?.id) {
+      this.gameService.requestCard(this.game.id).subscribe({
+        next: (response) => {
+          // Actualiza el estado del juego si es necesario
+          console.log('Request card action:', response);
+        },
+        error: (err) => {
+          this.errorMessage = err.error?.message || 'Failed to request card';
         }
       });
     }
