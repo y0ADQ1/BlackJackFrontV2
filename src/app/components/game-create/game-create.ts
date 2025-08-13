@@ -4,11 +4,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { GameService } from '../../services/game';
+import { GameJoinComponent} from '../game-join/game-join';
 
 @Component({
   selector: 'app-game-create',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, GameJoinComponent],
   templateUrl: './game-create.html',
   styleUrls: ['./game-create.scss']
 })
