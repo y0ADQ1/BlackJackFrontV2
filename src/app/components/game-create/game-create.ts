@@ -1,3 +1,4 @@
+// game-create.component.ts
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -18,12 +19,13 @@ export class GameCreateComponent {
   constructor(private gameService: GameService, private router: Router) {}
 
   createGame(): void {
-    if (this.maxPlayers < 5 || this.maxPlayers > 8) {
-      this.errorMessage = 'Maximum players must be between 5 and 8';
+    if (this.maxPlayers < 4 || this.maxPlayers > 8) {
+      this.errorMessage = 'Maximum non-host players must be between 4 and 8';
       return;
     }
 
-    this.gameService.createGame(5, this.maxPlayers).subscribe({
+    this.gameService.createGame(4, this.maxPlayers).subscribe({
+      // Updated minPlayers to 4
       next: (response) => {
         if (response.success) {
           this.router.navigate(['/game', response.game.id]);

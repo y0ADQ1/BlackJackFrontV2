@@ -2,29 +2,29 @@
   @if (game) {
     <h2>Blackjack - Room {{ game.roomCode }}</h2>
     <p>Status: {{ game.status }}</p>
-    <p>Players: {{ game.players.length }} / {{ game.maxPlayers }} (including host)</p>
-    @if (game.status === 'waiting' && game.players.length < 5) {
-      <p class="waiting-message">Waiting for {{ 5 - game.players.length }} more player(s) to start the game</p>
+    <p>Players: {{ (game.players | filterNonHost).length }} / {{ game.maxPlayers }} (excluding host)</p>
+    @if (game.status === 'waiting' && (game.players | filterNonHost).length < 4) {
+      <p class="waiting-message">Waiting for {{ 4 - (game.players | filterNonHost).length }} more player(s) to start the game</p>
     }
 
-    <!-- Notificación de unión (toast) -->
+    <!-- Notification (toast) -->
     @if (notificationMessage) {
       <div class="notification">
         {{ notificationMessage }}
       </div>
     }
 
-    <!-- Mensaje de error -->
+    <!-- Error message -->
     @if (errorMessage) {
       <p class="error">{{ errorMessage }}</p>
     }
 
-    <!-- Mensaje de fin de juego -->
+    <!-- Game ended message -->
     @if (gameEndedReason) {
       <p class="game-ended">Game Ended: {{ gameEndedReason }}</p>
     }
 
-    <!-- Lista de jugadores -->
+    <!-- Player list -->
     <div class="players">
       <h3>Players</h3>
       @for (player of game.players; track player.id) {
@@ -33,36 +33,38 @@
           @if (player.isHost) {
             <p>Host</p>
           }
-          @if (player.isCurrentTurn) {
+          @if (player.isCurrentTurn && !player.isHost) {
             <p>Current Turn</p>
           }
-          <p>Score: {{ player.totalScore ?? 'Hidden' }}</p>
-          <p>Status: {{ player.wantsCards ? 'Playing' : 'Standing' }}</p>
-          <div class="cards">
-            @for (card of player.cards; track card.id) {
-              <img [src]="!card.isVisible ? environment.assetsUrl + '/output_embedded.svg' : environment.assetsUrl + '/' + card.filename"
-                  alt="{{ !card.isVisible ? 'Hidden Card' : card.value + ' of ' + card.suit }}"
-                  class="card">
-            }
-          </div>
-          @if (game.userPlayer?.isHost && !player.isCurrentTurn && player.wantsCards) {
+          @if (!player.isHost) {
+            <p>Score: {{ player.totalScore ?? 'Hidden' }}</p>
+            <p>Status: {{ player.wantsCards ? 'Playing' : 'Standing' }}</p>
+            <div class="cards">
+              @for (card of player.cards; track card.id) {
+                <img [src]="card.isVisible ? environment.assetsUrl + '/' + card.filename : environment.assetsUrl + '/output_embedded.svg'"
+                     [alt]="card.isVisible ? card.value + ' of ' + card.suit : 'Hidden Card'"
+                     class="card">
+              }
+            </div>
+          }
+          @if (game.userPlayer?.isHost && player.isCurrentTurn && player.wantsCards && !player.isHost) {
             <button (click)="dealCard(player.id)">Deal Card</button>
           }
         </div>
       }
     </div>
 
-    <!-- Acciones del jugador -->
+    <!-- Player actions -->
     @if (game.userPlayer) {
       <div class="actions">
         @if (game.status === 'waiting' && game.userPlayer.isHost) {
-          <button (click)="startGame()" [disabled]="game.players.length < 5">Start Game</button>
+          <button (click)="startGame()" [disabled]="(game.players | filterNonHost).length < 4">Start Game</button>
         }
-        @if (game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards) {
+        @if (game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost) {
           <button (click)="requestCard()">Hit</button>
           <button (click)="skipTurn()">Stand</button>
         }
-        @if (game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal) {
+        @if (game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal && !game.userPlayer.isHost) {
           <button (click)="requestReveal()">Request Reveal</button>
         }
         @if (game.status === 'finished' && game.userPlayer.isHost) {

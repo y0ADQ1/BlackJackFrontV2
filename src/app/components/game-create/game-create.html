@@ -1,10 +1,10 @@
 <div class="container">
   <h2>Create New Game</h2>
-  <p>A minimum of 4 players (plus the host) is required to start the game.</p>
+  <p>A minimum of 4 non-host players (plus the host) is required to start the game.</p>
   <form (ngSubmit)="createGame()">
     <div class="form-group">
-      <label for="maxPlayers">Maximum Players (5-8):</label>
-      <input type="number" id="maxPlayers" [(ngModel)]="maxPlayers" name="maxPlayers" min="5" max="8" required>
+      <label for="maxPlayers">Maximum Non-Host Players (4-8):</label>
+      <input type="number" id="maxPlayers" [(ngModel)]="maxPlayers" name="maxPlayers" min="4" max="8" required>
     </div>
     <button type="submit">Create Game</button>
     @if (errorMessage) {
