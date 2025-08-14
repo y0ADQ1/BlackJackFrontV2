@@ -7,7 +7,8 @@ import { GamePlayer } from '../models/game-player.model';
   standalone: true
 })
 export class FilterNonHostPipe implements PipeTransform {
-  transform(players: GamePlayer[]): GamePlayer[] {
+  transform(players: GamePlayer[] | undefined | null): GamePlayer[] {
+    if (!players) return [];
     return players.filter(player => !player.isHost);
   }
 }

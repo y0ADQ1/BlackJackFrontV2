@@ -1,80 +1,72 @@
 <div class="container">
-  @if (game) {
+  <ng-container *ngIf="game">
     <h2>Blackjack - Room {{ game.roomCode }}</h2>
     <p>Status: {{ game.status }}</p>
     <p>Players: {{ (game.players | filterNonHost).length }} / {{ game.maxPlayers }} (excluding host)</p>
-    @if (game.status === 'waiting' && (game.players | filterNonHost).length < 4) {
-      <p class="waiting-message">Waiting for {{ 4 - (game.players | filterNonHost).length }} more player(s) to start the game</p>
-    }
+    <p class="waiting-message" *ngIf="game.status === 'waiting' && (game.players | filterNonHost).length < 4">
+      Waiting for {{ 4 - (game.players | filterNonHost).length }} more player(s) to start the game
+    </p>
 
     <!-- Notification (toast) -->
-    @if (notificationMessage) {
-      <div class="notification">
-        {{ notificationMessage }}
-      </div>
-    }
+    <div class="notification" *ngIf="notificationMessage">
+      {{ notificationMessage }}
+    </div>
 
     <!-- Error message -->
-    @if (errorMessage) {
-      <p class="error">{{ errorMessage }}</p>
-    }
+    <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
     <!-- Game ended message -->
-    @if (gameEndedReason) {
-      <p class="game-ended">Game Ended: {{ gameEndedReason }}</p>
-    }
+    <p class="game-ended" *ngIf="gameEndedReason">Game Ended: {{ gameEndedReason }}</p>
 
     <!-- Player list -->
     <div class="players">
       <h3>Players</h3>
-      @for (player of game.players; track player.id) {
-        <div class="player">
-          <p>{{ player.username }} (Position: {{ player.position }})</p>
-          @if (player.isHost) {
-            <p>Host</p>
-          }
-          @if (player.isCurrentTurn && !player.isHost) {
-            <p>Current Turn</p>
-          }
-          @if (!player.isHost) {
-            <p>Score: {{ player.totalScore ?? 'Hidden' }}</p>
-            <p>Status: {{ player.wantsCards ? 'Playing' : 'Standing' }}</p>
-            <div class="cards">
-              @for (card of player.cards; track card.id) {
-                <img [src]="card.isVisible ? environment.assetsUrl + '/' + card.filename : environment.assetsUrl + '/output_embedded.svg'"
-                     [alt]="card.isVisible ? card.value + ' of ' + card.suit : 'Hidden Card'"
-                     class="card">
-              }
-            </div>
-            @if (player.totalScore != null && player.totalScore > 21) {
-              <p class="busted">Perdiste (Busted)</p>
-            }
-          }
-          @if (game.userPlayer?.isHost && player.isCurrentTurn && player.wantsCards && !player.isHost) {
-            <button (click)="dealCardWebsocket(player.id)">Deal Card</button>
-          }
-        </div>
-      }
+      <div class="player" *ngFor="let player of game.players; trackBy: trackById">
+        <p>{{ player.username }} (Position: {{ player.position }})</p>
+        <p *ngIf="player.isHost">Host</p>
+        <p *ngIf="player.isCurrentTurn && !player.isHost">Current Turn</p>
+        <ng-container *ngIf="!player.isHost">
+          <p>Score: {{ player.totalScore ?? 'Hidden' }}</p>
+          <p>Status: {{ player.wantsCards ? 'Playing' : 'Standing' }}</p>
+          <div class="cards">
+            <img *ngFor="let card of player.cards; trackBy: trackById"
+                 [src]="card.isVisible ? environment.assetsUrl + '/' + card.filename : environment.assetsUrl + '/output_embedded.svg'"
+                 [alt]="card.isVisible ? card.value + ' of ' + card.suit : 'Hidden Card'"
+                 class="card">
+          </div>
+          <p class="busted" *ngIf="player.totalScore != null && player.totalScore > 21">Perdiste (Busted)</p>
+        </ng-container>
+  <button class="big-deal-btn"
+    *ngIf="game.userPlayer?.isHost && !player.isHost"
+    [disabled]="!pendingCardRequest || pendingCardRequest.playerId !== player.id || !player.isCurrentTurn || !player.wantsCards"
+    (click)="dealCardWebsocket(player.id)">
+    Deal Card
+  </button>
+      </div>
     </div>
 
     <!-- Player actions -->
-    @if (game.userPlayer) {
-      <div class="actions">
-        @if (game.status === 'waiting' && game.userPlayer.isHost) {
-          <button (click)="startGame()" [disabled]="(game.players | filterNonHost).length < 4">Start Game</button>
-        }
-        @if (game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost) {
-          <button (click)="requestCardFromService()">Hit</button>
-          <button (click)="skipTurn()">Stand</button>
-        }
-        @if (game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal && !game.userPlayer.isHost) {
-          <button (click)="requestReveal()">Request Reveal</button>
-        }
-        @if (game.status === 'finished' && game.userPlayer.isHost) {
-          <button (click)="rematch()">Rematch</button>
-        }
-        <button (click)="leaveGame()">Leave Game</button>
+    <div class="actions" *ngIf="game.userPlayer">
+      <button *ngIf="game.status === 'waiting' && game.userPlayer.isHost" (click)="startGame()" [disabled]="(game.players | filterNonHost).length < 4">Start Game</button>
+      <button *ngIf="game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost" (click)="requestCardFromService()">Hit</button>
+      <button *ngIf="game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost" (click)="skipTurn()">Stand</button>
+      <button *ngIf="game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal && !game.userPlayer.isHost" (click)="requestReveal()">Request Reveal</button>
+  <button *ngIf="game.status === 'finished'" (click)="rematch()">Rematch</button>
+  <button (click)="leaveGame()" *ngIf="!hasVotedRematch">Leave Game</button>
+    </div>
+
+    <!-- Modal de ganador -->
+    <div class="winner-modal-backdrop" *ngIf="showWinnerModal">
+      <div class="winner-modal">
+        <h2>¡Fin de la partida!</h2>
+        <p *ngIf="winnerName">Ganador: <strong>{{ winnerName }}</strong></p>
+        <p *ngIf="!winnerName">No hubo ganador, todos se pasaron de 21.</p>
+        <div class="winner-modal-actions">
+          <button (click)="rematch()">Revancha</button>
+          <button (click)="leaveGame()">Salir de la sala</button>
+        </div>
       </div>
-    }
-  }
+    </div>
+  </ng-container>
 </div>
+

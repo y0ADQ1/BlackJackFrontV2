@@ -19,12 +19,18 @@ import { FilterNonHostPipe } from '../../pipes/filter-non-host.pipe';
   providers: [FilterNonHostPipe]
 })
 export class GameComponent implements OnInit, OnDestroy {
+  hasVotedRematch = false;
   game: Game | null = null;
   errorMessage = '';
   gameEndedReason = '';
   notificationMessage = '';
   environment = environment;
   private subscriptions: Subscription[] = [];
+  pendingCardRequest: { playerId: number; username: string } | null = null;
+
+  // Modal de ganador
+  showWinnerModal = false;
+  winnerName = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -36,6 +42,12 @@ export class GameComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+      // Escuchar confirmación de voto de rematch
+      this.websocketService.rematchVoteConfirmed$.subscribe(data => {
+        if (data.hasVoted) {
+          this.hasVotedRematch = true;
+        }
+      })
     const gameId = Number(this.route.snapshot.paramMap.get('id'));
     if (isNaN(gameId)) {
       this.errorMessage = 'Invalid game ID';
@@ -68,17 +80,26 @@ export class GameComponent implements OnInit, OnDestroy {
           this.router.navigate(['/login']);
         }
       }),
+      // Suscribirse a la expulsión global
+      this.websocketService.forceLeaveAll$.subscribe(data => {
+        this.errorMessage = data.message || 'Un jugador abandonó la partida. Todos han sido expulsados.';
+        setTimeout(() => {
+          this.router.navigate(['/games']);
+        }, 2000);
+      }),
       this.websocketService.gameState$.subscribe(gameState => {
         // Detectar si alguien tiene 21 y terminó la partida
         if (gameState.status === 'finished' && gameState.cardsRevealed) {
           const winner = gameState.players.find(p => p.userId === gameState.winnerId);
-          if (winner && winner.totalScore !== null && winner.totalScore === 21) {
-            this.notificationMessage = `¡${winner.username} logró 21! Fin de la partida.`;
-            setTimeout(() => this.notificationMessage = '', 4000);
-          } else if (!winner) {
-            this.notificationMessage = 'Nadie ganó, todos se pasaron de 21.';
-            setTimeout(() => this.notificationMessage = '', 4000);
+          if (winner) {
+            this.winnerName = winner.username;
+            this.showWinnerModal = true;
+          } else {
+            this.winnerName = '';
+            this.showWinnerModal = true;
           }
+        } else {
+          this.showWinnerModal = false;
         }
         // Notificar si un jugador se pasó de 21
         if (gameState.players) {
@@ -90,6 +111,15 @@ export class GameComponent implements OnInit, OnDestroy {
             });
           }
         }
+
+        // Limpiar pendingCardRequest si ya no es el turno del jugador o ya no quiere carta
+        if (this.pendingCardRequest && gameState.status === 'playing') {
+          const player = gameState.players.find(p => p.id === this.pendingCardRequest!.playerId);
+          if (!player || !player.isCurrentTurn || !player.wantsCards) {
+            this.pendingCardRequest = null;
+          }
+        }
+
         this.game = gameState;
       }),
       this.websocketService.playerJoined$.subscribe(data => {
@@ -117,9 +147,13 @@ export class GameComponent implements OnInit, OnDestroy {
         this.gameEndedReason = data.reason;
         console.log('Game ended:', data);
       }),
-      this.websocketService.playerAction$.subscribe(data => {
-        // Solo el host debe ver el toast
-        if (this.game?.userPlayer?.isHost) {
+      this.websocketService.playerAction$.subscribe((data: { message: string; playerId?: number; username?: string }) => {
+        // Solo el host debe ver el toast y habilitar el botón
+        if (this.game?.userPlayer?.isHost && data.playerId && data.username) {
+          this.pendingCardRequest = { playerId: data.playerId, username: data.username };
+          this.notificationMessage = data.message;
+          setTimeout(() => this.notificationMessage = '', 5000);
+        } else if (this.game?.userPlayer?.isHost) {
           this.notificationMessage = data.message;
           setTimeout(() => this.notificationMessage = '', 3000);
         }
@@ -173,6 +207,10 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   leaveGame(): void {
+    if (this.hasVotedRematch) {
+      // No permitir salir si ya votó rematch
+      return;
+    }
     if (this.game?.id && this.game?.roomCode) {
       this.gameService.leaveGame(this.game.id).subscribe({
         next: () => {
@@ -209,6 +247,7 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.game?.roomCode && this.game.userPlayer?.isHost) {
       this.websocketService.dealCard(this.game.roomCode, targetPlayerId);
       console.log('Host is dealing card to player:', targetPlayerId, 'in game:', this.game.roomCode);
+      // Ya no ocultar el botón aquí, solo cuando el backend actualice el estado
     }
   }
 
@@ -228,11 +267,17 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   requestCardFromService(): void {
-    if (this.game?.id) {
+    if (this.game?.id && this.game?.roomCode && this.game?.userPlayer && !this.game.userPlayer.isHost) {
       this.gameService.requestCard(this.game.id).subscribe({
         next: (response) => {
-          // Actualiza el estado del juego si es necesario
           console.log('Request card action:', response);
+          // Notificar al host por WebSocket (workaround)
+          if (response && response.action === 'requestCard' && response.playerId) {
+            const player = this.game?.players.find(p => p.id === response.playerId);
+            if (player && this.game?.roomCode) {
+              this.websocketService.notifyHostCardRequest(this.game.roomCode, player.id, player.username);
+            }
+          }
         },
         error: (err) => {
           this.errorMessage = err.error?.message || 'Failed to request card';
@@ -240,4 +285,6 @@ export class GameComponent implements OnInit, OnDestroy {
       });
     }
   }
+
+  trackById(index: number, item: any) { return item.id; }
 }
