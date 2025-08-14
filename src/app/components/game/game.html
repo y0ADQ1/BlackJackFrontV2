@@ -12,6 +12,11 @@
       {{ notificationMessage }}
     </div>
 
+    <!-- Host status message -->
+    <div class="host-status" *ngIf="hostStatusMessage">
+      {{ hostStatusMessage }}
+    </div>
+
     <!-- Error message -->
     <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
@@ -23,7 +28,10 @@
       <h3>Players</h3>
       <div class="player" *ngFor="let player of game.players; trackBy: trackById">
         <p>{{ player.username }} (Position: {{ player.position }})</p>
-        <p *ngIf="player.isHost">Host</p>
+        <p *ngIf="player.isHost && temporaryHostName && player.username === temporaryHostName">
+          <span class="temporary-host">Host Temporal</span>
+        </p>
+        <p *ngIf="player.isHost && (!temporaryHostName || player.username !== temporaryHostName)">Host</p>
         <p *ngIf="player.isCurrentTurn && !player.isHost">Current Turn</p>
         <ng-container *ngIf="!player.isHost">
           <p>Score: {{ player.totalScore ?? 'Hidden' }}</p>
@@ -49,7 +57,7 @@
     <div class="actions" *ngIf="game.userPlayer">
       <button *ngIf="game.status === 'waiting' && game.userPlayer.isHost" (click)="startGame()" [disabled]="(game.players | filterNonHost).length < 4">Start Game</button>
       <button *ngIf="game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost" (click)="requestCardFromService()">Hit</button>
-      <button *ngIf="game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost" (click)="skipTurn()">Stand</button>
+      <button *ngIf="game.status === 'playing' && game.userPlayer.isCurrentTurn && game.userPlayer.wantsCards && !game.userPlayer.isHost" (click)="standWebsocket()">Stand</button>
       <button *ngIf="game.status === 'playing' && game.userPlayer.totalScore === 21 && !game.userPlayer.hasRequestedReveal && !game.userPlayer.isHost" (click)="requestReveal()">Request Reveal</button>
   <button *ngIf="game.status === 'finished'" (click)="rematch()">Rematch</button>
   <button (click)="leaveGame()" *ngIf="!hasVotedRematch">Leave Game</button>

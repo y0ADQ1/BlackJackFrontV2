@@ -24,6 +24,8 @@ export class GameComponent implements OnInit, OnDestroy {
   errorMessage = '';
   gameEndedReason = '';
   notificationMessage = '';
+  hostStatusMessage = '';
+  temporaryHostName = '';
   environment = environment;
   private subscriptions: Subscription[] = [];
   pendingCardRequest: { playerId: number; username: string } | null = null;
@@ -63,6 +65,7 @@ export class GameComponent implements OnInit, OnDestroy {
             next: (response) => {
               if (response.success && response.game) {
                 this.game = response.game;
+                console.log('Game loaded - Status:', response.game.status, 'RoomCode:', response.game.roomCode);
                 this.websocketService.joinGame(response.game.roomCode);
                 console.log('Initial game state loaded:', response.game);
               } else {
@@ -82,12 +85,36 @@ export class GameComponent implements OnInit, OnDestroy {
       }),
       // Suscribirse a la expulsión global
       this.websocketService.forceLeaveAll$.subscribe(data => {
-        this.errorMessage = data.message || 'Un jugador abandonó la partida. Todos han sido expulsados.';
-        setTimeout(() => {
-          this.router.navigate(['/games']);
-        }, 2000);
+        console.log('Received forceLeaveAll:', data, 'Game status:', this.game?.status);
+        
+        // Solo redirigir si el juego NO está en estado 'waiting'
+        // Si está en 'waiting', permitir la reconexión
+        if (this.game?.status !== 'waiting') {
+          this.errorMessage = data.message || 'Un jugador abandonó la partida. Todos han sido expulsados.';
+          setTimeout(() => {
+            this.router.navigate(['/games']);
+          }, 2000);
+        } else {
+          // Para juegos en estado 'waiting', solo mostrar un mensaje informativo
+          // sin redirigir, para permitir la reconexión
+          console.log('Game is in waiting state, allowing reconnection');
+          this.notificationMessage = data.message || 'Un jugador se desconectó, pero puedes seguir en la sala.';
+          setTimeout(() => this.notificationMessage = '', 3000);
+        }
       }),
       this.websocketService.gameState$.subscribe(gameState => {
+        // Verificar si el usuario actual recuperó su estado de host original
+        const previousIsHost = this.game?.userPlayer?.isHost || false;
+        const currentIsHost = gameState.userPlayer?.isHost || false;
+        
+        // Si no era host antes pero ahora sí (recuperación de host original)
+        if (!previousIsHost && currentIsHost && this.hostStatusMessage) {
+          this.hostStatusMessage = '';
+          this.temporaryHostName = '';
+          this.notificationMessage = 'Has recuperado tu rol de host original';
+          setTimeout(() => this.notificationMessage = '', 3000);
+        }
+
         // Detectar si alguien tiene 21 y terminó la partida
         if (gameState.status === 'finished' && gameState.cardsRevealed) {
           const winner = gameState.players.find(p => p.userId === gameState.winnerId);
@@ -157,6 +184,31 @@ export class GameComponent implements OnInit, OnDestroy {
           this.notificationMessage = data.message;
           setTimeout(() => this.notificationMessage = '', 3000);
         }
+      }),
+      this.websocketService.playerStand$.subscribe(data => {
+        this.notificationMessage = data.message;
+        setTimeout(() => this.notificationMessage = '', 3000);
+        console.log('Player stand notification:', data);
+      }),
+      this.websocketService.hostTransfer$.subscribe(data => {
+        this.notificationMessage = data.message;
+        // Si es temporal, también actualizar el mensaje de estado del host
+        if (data.isTemporary) {
+          this.hostStatusMessage = `Host temporal: ${data.newHostName || 'Otro jugador'}`;
+          this.temporaryHostName = data.newHostName || '';
+        }
+        // Mostrar por más tiempo si es una transferencia temporal
+        const timeout = data.isTemporary ? 5000 : 3000;
+        setTimeout(() => this.notificationMessage = '', timeout);
+        console.log('Host transfer notification:', data);
+      }),
+      this.websocketService.hostRestored$.subscribe(data => {
+        this.notificationMessage = data.message;
+        // Limpiar el mensaje de host temporal
+        this.hostStatusMessage = '';
+        this.temporaryHostName = '';
+        setTimeout(() => this.notificationMessage = '', 4000);
+        console.log('Host restored notification:', data);
       })
     );
   }
@@ -187,6 +239,13 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.game?.roomCode && !this.game.userPlayer?.isHost) {
       this.websocketService.skipTurn(this.game.roomCode);
       console.log('Skipping turn for:', this.game.roomCode);
+    }
+  }
+
+  standWebsocket(): void {
+    if (this.game?.roomCode && !this.game.userPlayer?.isHost) {
+      this.websocketService.stand(this.game.roomCode);
+      console.log('Standing for:', this.game.roomCode);
     }
   }
 

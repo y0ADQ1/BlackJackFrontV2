@@ -23,6 +23,14 @@ export class WebsocketService {
   playerJoined$ = this.playerJoinedSubject.asObservable();
   private playerActionSubject = new Subject<{ message: string; playerId?: number; username?: string }>();
   playerAction$ = this.playerActionSubject.asObservable();
+  private playerStandSubject = new Subject<{ userId: number; playerName: string; roomCode: string; message: string }>();
+  playerStand$ = this.playerStandSubject.asObservable();
+
+  private hostTransferSubject = new Subject<{ message: string; isTemporary?: boolean; newHostName?: string }>();
+  hostTransfer$ = this.hostTransferSubject.asObservable();
+
+  private hostRestoredSubject = new Subject<{ message: string; originalHostName?: string }>();
+  hostRestored$ = this.hostRestoredSubject.asObservable();
 
   private forceLeaveAllSubject = new Subject<{ reason: string; message: string }>();
   forceLeaveAll$ = this.forceLeaveAllSubject.asObservable();
@@ -49,7 +57,7 @@ export class WebsocketService {
   }
 
   joinGame(roomCode: string): void {
-    console.log('Joining game:', roomCode);
+    console.log('Joining game:', roomCode, 'Socket ID:', this.socket.id);
     this.socket.emit('joinGame', { roomCode });
   }
 
@@ -66,6 +74,11 @@ export class WebsocketService {
   skipTurn(roomCode: string): void {
     console.log('Skipping turn for game:', roomCode);
     this.socket.emit('skipTurn', { roomCode });
+  }
+
+  stand(roomCode: string): void {
+    console.log('Standing for game:', roomCode);
+    this.socket.emit('stand', { roomCode });
   }
 
   requestReveal(roomCode: string): void {
@@ -140,7 +153,26 @@ export class WebsocketService {
     // Escuchar evento de expulsión global
     this.socket.on('forceLeaveAll', (data: { reason: string; message: string }) => {
       console.warn('Recibido forceLeaveAll:', data);
+      console.log('Socket ID:', this.socket.id, 'Data:', data);
       this.forceLeaveAllSubject.next(data);
+    });
+
+    // Escuchar evento de stand de jugador
+    this.socket.on('playerStand', (data: { userId: number; playerName: string; roomCode: string; message: string }) => {
+      console.log('Player stand event received:', data);
+      this.playerStandSubject.next(data);
+    });
+
+    // Escuchar eventos de transferencia de host
+    this.socket.on('hostTransferred', (data: { message: string; isTemporary?: boolean; newHostName?: string }) => {
+      console.log('Host transferred event received:', data);
+      this.hostTransferSubject.next(data);
+    });
+
+    // Escuchar eventos de restauración de host original
+    this.socket.on('hostRestored', (data: { message: string; originalHostName?: string }) => {
+      console.log('Host restored event received:', data);
+      this.hostRestoredSubject.next(data);
     });
   }
 }
